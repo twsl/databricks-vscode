@@ -45,6 +45,7 @@ import {setDbnbCellLimits} from "./language/notebooks/DatabricksNbCellLimits";
 import {DbConnectStatusBarButton} from "./language/DbConnectStatusBarButton";
 import {NotebookInitScriptManager} from "./language/notebooks/NotebookInitScriptManager";
 import {showRestartNotebookDialogue} from "./language/notebooks/restartNotebookDialogue";
+import {DatabricksNotebookKernelManager} from "./language/notebooks/DatabricksNotebookKernelManager";
 import {
     BundleWatcher,
     BundleFileSet,
@@ -74,6 +75,11 @@ import {SyncCommands} from "./sync/SyncCommands";
 import {CodeSynchronizer} from "./sync";
 import {BundlePipelinesManager} from "./bundle/BundlePipelinesManager";
 import {DocsViewTreeDataProvider} from "./ui/docs-view/DocsViewTreeDataProvider";
+import {
+    ArtifactSyncManager,
+    ArtifactSyncConfig,
+    ArtifactSyncStatusBar,
+} from "./bundle/artifact-sync";
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const packageJson = require("../package.json");
@@ -495,6 +501,16 @@ export async function activate(
         )
     );
 
+    const notebookKernelManager = new DatabricksNotebookKernelManager(
+        connectionManager
+    );
+    context.subscriptions.push(
+        notebookKernelManager,
+        telemetry.registerCommand("databricks.kernel.restart", () =>
+            notebookKernelManager.restartKernel()
+        )
+    );
+
     notebookInitScriptManager.updateInitScript().catch((e) => {
         logging.NamedLogger.getOrCreate(Loggers.Extension).error(
             "Failed to update init script",
@@ -544,6 +560,59 @@ export async function activate(
             syncCommands
         )
     );
+
+    // Artifact Sync
+    const artifactSyncConfig = new ArtifactSyncConfig(
+        bundleValidateModel,
+        workspaceFolderManager.activeProjectUri
+    );
+    const artifactSyncManager = new ArtifactSyncManager(
+        connectionManager,
+        codeSynchroniser,
+        artifactSyncConfig
+    );
+    const artifactSyncStatusBar = new ArtifactSyncStatusBar(
+        artifactSyncManager
+    );
+    context.subscriptions.push(
+        artifactSyncManager,
+        artifactSyncStatusBar,
+        telemetry.registerCommand(
+            "databricks.artifactSync.start",
+            () => artifactSyncManager.start(),
+            artifactSyncManager
+        ),
+        telemetry.registerCommand(
+            "databricks.artifactSync.stop",
+            () => artifactSyncManager.stop(),
+            artifactSyncManager
+        ),
+        telemetry.registerCommand(
+            "databricks.artifactSync.installOnce",
+            () => artifactSyncManager.installOnce(),
+            artifactSyncManager
+        ),
+        telemetry.registerCommand(
+            "databricks.artifactSync.toggleMode",
+            () => artifactSyncManager.toggleMode(),
+            artifactSyncManager
+        ),
+        telemetry.registerCommand(
+            "databricks.artifactSync.removeArtifacts",
+            () => artifactSyncManager.removeArtifacts(),
+            artifactSyncManager
+        ),
+        telemetry.registerCommand(
+            "databricks.artifactSync.openSettings",
+            () => {
+                commands.executeCommand(
+                    "workbench.action.openSettings",
+                    "databricks.artifactSync"
+                );
+            }
+        )
+    );
+
     const configurationDataProvider = new ConfigurationDataProvider(
         connectionManager,
         codeSynchroniser,
@@ -551,7 +620,8 @@ export async function activate(
         configModel,
         cli,
         featureManager,
-        workspaceFolderManager
+        workspaceFolderManager,
+        artifactSyncManager
     );
     const configurationView = window.createTreeView("configurationView", {
         treeDataProvider: configurationDataProvider,
@@ -559,7 +629,8 @@ export async function activate(
 
     const configurationTreeViewManager = new ConfigurationTreeViewManager(
         configurationView,
-        configModel
+        configModel,
+        artifactSyncManager
     );
 
     const clusterModel = new ClusterModel(connectionManager);

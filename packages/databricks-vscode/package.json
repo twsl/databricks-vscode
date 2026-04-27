@@ -206,6 +206,13 @@
                 "category": "Databricks"
             },
             {
+                "command": "databricks.kernel.restart",
+                "title": "Restart Databricks Remote Kernel",
+                "enablement": "databricks.context.activated && databricks.context.loggedIn",
+                "icon": "$(debug-restart)",
+                "category": "Databricks"
+            },
+            {
                 "command": "databricks.connection.bundle.selectTarget",
                 "icon": "$(gear)",
                 "title": "Select a Declarative Automation Bundle target",
@@ -885,6 +892,13 @@
                 {
                     "submenu": "databricks.run",
                     "when": "!databricks.context.remoteMode && (resourceLangId == python || resourceExtname == .ipynb || databricks.context.showRunAsWorkflow)"
+                }
+            ],
+            "notebook/toolbar": [
+                {
+                    "command": "databricks.kernel.restart",
+                    "group": "navigation/execute@2",
+                    "when": "notebookKernel =~ /^databricks\\.remote-/ && isWorkspaceTrusted"
                 }
             ]
         },
