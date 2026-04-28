@@ -66,6 +66,9 @@ export class WorkflowRun {
     static async runPythonAndWait({
         client,
         clusterId,
+        environmentVersion,
+        customEnvironmentPath,
+        dependencies,
         path,
         args = [],
         onProgress,
@@ -73,6 +76,9 @@ export class WorkflowRun {
     }: {
         client: ApiClient;
         clusterId?: string;
+        environmentVersion?: string;
+        customEnvironmentPath?: string;
+        dependencies?: string[];
         path: string;
         args?: string[];
         onProgress?: (state: jobs.RunLifeCycleState, run: WorkflowRun) => void;
@@ -92,8 +98,20 @@ export class WorkflowRun {
         }
         const submitRunOptions: SubmitRun = {tasks: [task]};
         if (task["environment_key"]) {
+            const spec: Record<string, unknown> = {
+                environment_version: environmentVersion ?? "5",
+            };
+            if (customEnvironmentPath) {
+                spec.client = customEnvironmentPath;
+            }
+            if (dependencies && dependencies.length > 0) {
+                spec.dependencies = dependencies;
+            }
             submitRunOptions.environments = [
-                {environment_key: task["environment_key"], spec: {client: "1"}},
+                {
+                    environment_key: task["environment_key"],
+                    spec,
+                },
             ];
         }
         const run = await this.submitRun(client, submitRunOptions);

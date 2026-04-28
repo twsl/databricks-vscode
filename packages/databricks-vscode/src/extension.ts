@@ -74,6 +74,7 @@ import {SyncCommands} from "./sync/SyncCommands";
 import {CodeSynchronizer} from "./sync";
 import {BundlePipelinesManager} from "./bundle/BundlePipelinesManager";
 import {DocsViewTreeDataProvider} from "./ui/docs-view/DocsViewTreeDataProvider";
+import {ServerlessEnvironmentService} from "./serverless/ServerlessEnvironmentService";
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const packageJson = require("../package.json");
@@ -325,6 +326,13 @@ export async function activate(
         customWhenContext,
         telemetry
     );
+    const serverlessEnvironmentService = new ServerlessEnvironmentService(
+        configModel,
+        pythonExtensionWrapper
+    );
+    connectionManager.setServerlessEnvironmentService(
+        serverlessEnvironmentService
+    );
     context.subscriptions.push(
         bundleFileWatcher,
         bundleValidateModel,
@@ -432,7 +440,8 @@ export async function activate(
                 connectionManager,
                 pythonExtensionWrapper,
                 environmentDependenciesInstaller,
-                configureAutocomplete
+                configureAutocomplete,
+                serverlessEnvironmentService
             )
     );
     const environmentCommands = new EnvironmentCommands(
@@ -569,7 +578,8 @@ export async function activate(
         connectionManager,
         clusterModel,
         configModel,
-        cli
+        cli,
+        serverlessEnvironmentService
     );
 
     context.subscriptions.push(
@@ -603,6 +613,16 @@ export async function activate(
         telemetry.registerCommand(
             "databricks.connection.attachClusterQuickPick",
             connectionCommands.attachClusterQuickPickCommand(),
+            connectionCommands
+        ),
+        telemetry.registerCommand(
+            "databricks.serverless.selectEnvironmentVersion",
+            connectionCommands.selectServerlessEnvironmentVersion,
+            connectionCommands
+        ),
+        telemetry.registerCommand(
+            "databricks.serverless.selectHardware",
+            connectionCommands.selectServerlessHardware,
             connectionCommands
         ),
         telemetry.registerCommand(

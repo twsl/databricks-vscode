@@ -193,9 +193,17 @@ export class WorkflowRunner implements Disposable {
                               syncDestinationMapper.remoteUri
                           )
                         : undefined;
+                const resolvedServerlessEnvironment =
+                    cluster === undefined
+                        ? await this.connectionManager.resolveServerlessEnvironment()
+                        : undefined;
                 const response = await WorkflowRun.runPythonAndWait({
                     client: this.connectionManager.workspaceClient!.apiClient,
                     clusterId: cluster?.id,
+                    environmentVersion:
+                        resolvedServerlessEnvironment?.environment.version,
+                    customEnvironmentPath:
+                        resolvedServerlessEnvironment?.customEnvironmentPath,
                     path: wrappedFile ? wrappedFile.path : originalFileUri.path,
                     args: args ?? [],
                     onProgress: (

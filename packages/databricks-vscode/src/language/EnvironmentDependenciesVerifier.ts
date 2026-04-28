@@ -9,6 +9,10 @@ import {FeatureStepState} from "../feature-manager/FeatureManager";
 import {ResolvedEnvironment} from "./MsPythonExtensionApi";
 import {NamedLogger} from "@databricks/sdk-experimental/dist/logging";
 import {ConfigureAutocomplete} from "./ConfigureAutocomplete";
+import {
+    ServerlessEnvironmentService,
+    SupportedServerlessEnvironment,
+} from "../serverless/ServerlessEnvironmentService";
 
 export class EnvironmentDependenciesVerifier extends MultiStepAccessVerifier {
     private readonly logger = NamedLogger.getOrCreate(Loggers.Extension);
@@ -17,7 +21,8 @@ export class EnvironmentDependenciesVerifier extends MultiStepAccessVerifier {
         private readonly connectionManager: ConnectionManager,
         private readonly pythonExtension: MsPythonExtensionWrapper,
         private readonly installer: EnvironmentDependenciesInstaller,
-        private readonly configureAutocomplete: ConfigureAutocomplete
+        private readonly configureAutocomplete: ConfigureAutocomplete,
+        private readonly serverlessEnvironmentService: ServerlessEnvironmentService
     ) {
         super([
             "checkCluster",
@@ -76,6 +81,12 @@ export class EnvironmentDependenciesVerifier extends MultiStepAccessVerifier {
     async reinstallDbConnect() {
         await commands.executeCommand(
             "databricks.environment.reinstallDBConnect"
+        );
+    }
+
+    async selectServerlessEnvironmentVersion() {
+        await commands.executeCommand(
+            "databricks.serverless.selectEnvironmentVersion"
         );
     }
 
@@ -173,6 +184,8 @@ export class EnvironmentDependenciesVerifier extends MultiStepAccessVerifier {
             : "No active environments found.";
     }
 
+    // Python version requirements per DBR major version.
+    // Source: https://docs.databricks.com/aws/en/dev-tools/databricks-connect/requirements#versions
     private getExpectedPythonVersionMessage(dbrVersionParts: (number | "x")[]) {
         if (dbrVersionParts[0] === 13 || dbrVersionParts[0] === 14) {
             return "3.10";
@@ -183,12 +196,14 @@ export class EnvironmentDependenciesVerifier extends MultiStepAccessVerifier {
         if (dbrVersionParts[0] === 16) {
             return "3.12";
         }
+        // DBR 17 and 18 require Python 3.12
         if (dbrVersionParts[0] !== "x" && dbrVersionParts[0] > 16) {
             return "3.12 or greater";
         }
         return "3.10 or greater";
     }
 
+    // Source: https://docs.databricks.com/aws/en/dev-tools/databricks-connect/requirements#versions
     private getVersionMismatchWarning(
         dbrMajor: "x" | number,
         env: ResolvedEnvironment,
@@ -203,25 +218,77 @@ export class EnvironmentDependenciesVerifier extends MultiStepAccessVerifier {
         if (dbrMajor === 15 && !this.matchEnvironmentVersion(env, 3, 11)) {
             return `Use python 3.11 to match DBR ${dbrMajor} requirements. ${currentPythonVersionMessage}`;
         }
-        if (dbrMajor === 16 && !this.matchEnvironmentVersion(env, 3, 12)) {
+        // DBR 16, 17, and 18 all require Python 3.12
+        if (
+            typeof dbrMajor === "number" &&
+            dbrMajor >= 16 &&
+            !this.matchEnvironmentVersion(env, 3, 12)
+        ) {
             return `Use python 3.12 to match DBR ${dbrMajor} requirements. ${currentPythonVersionMessage}`;
         }
         return undefined;
     }
 
+    private getServerlessPythonVersionMessage(
+        environment: SupportedServerlessEnvironment,
+        currentPythonVersionMessage: string
+    ) {
+        return `${environment.label} requires Python ${environment.pythonVersion}. ${currentPythonVersionMessage}`;
+    }
+
     async checkPythonEnvironment(): Promise<FeatureStepState> {
         try {
             const env = await this.pythonExtension.pythonEnvironment;
+            if (this.connectionManager.serverless) {
+                const resolvedServerlessEnvironment =
+                    await this.connectionManager.resolveServerlessEnvironment();
+                if (!resolvedServerlessEnvironment) {
+                    return this.rejectStep(
+                        "checkPythonEnvironment",
+                        "Resolve the current serverless environment",
+                        "No serverless environment is configured.",
+                        this.selectServerlessEnvironmentVersion.bind(this)
+                    );
+                }
+                const environment = resolvedServerlessEnvironment.environment;
+                if (
+                    !env?.environment ||
+                    !this.serverlessEnvironmentService.isPythonEnvironmentCompatible(
+                        environment,
+                        env
+                    )
+                ) {
+                    return this.rejectStep(
+                        "checkPythonEnvironment",
+                        `Activate an environment with Python ${environment.pythonVersion}`,
+                        this.getServerlessPythonVersionMessage(
+                            environment,
+                            this.getCurrentPythonVersionMessage(env)
+                        ),
+                        this.selectPythonInterpreter.bind(this)
+                    );
+                }
+                const executable =
+                    await this.pythonExtension.getPythonExecutable();
+                if (!executable) {
+                    return this.rejectStep(
+                        "checkPythonEnvironment",
+                        `Activate an environment with Python ${environment.pythonVersion}`,
+                        "No Python executable found.",
+                        this.selectPythonInterpreter.bind(this)
+                    );
+                }
+                return this.acceptStep(
+                    "checkPythonEnvironment",
+                    `Active Environment: ${env.environment.name}`,
+                    env.executable.uri?.fsPath
+                );
+            }
+
             let envVersionTooLow =
                 env?.version &&
                 (env.version.major !== 3 || env.version.minor < 10);
             let dbrVersion = this.connectionManager.cluster?.dbrVersion || [];
-            if (this.connectionManager.serverless) {
-                dbrVersion = [15, 1];
-                envVersionTooLow =
-                    env?.version &&
-                    (env.version.major !== 3 || env.version.minor < 11);
-            }
             const expectedPythonVersion =
                 this.getExpectedPythonVersionMessage(dbrVersion);
             if (!env?.environment || envVersionTooLow) {
@@ -268,20 +335,45 @@ export class EnvironmentDependenciesVerifier extends MultiStepAccessVerifier {
         }
     }
 
-    checkDatabricksConnectVersion(version: string) {
+    async checkDatabricksConnectVersion(version: string) {
         const dbconnectcVersionParts = version.split(".");
         const dbconnectMajor = parseInt(dbconnectcVersionParts[0], 10);
         const dbconnectMinor = parseInt(dbconnectcVersionParts[1], 10);
-        if (
-            this.connectionManager.serverless &&
-            (dbconnectMajor < 15 ||
-                (dbconnectMajor === 15 && dbconnectMinor < 1))
-        ) {
-            return this.rejectStep(
+        if (this.connectionManager.serverless) {
+            const resolvedServerlessEnvironment =
+                await this.connectionManager.resolveServerlessEnvironment();
+            if (!resolvedServerlessEnvironment) {
+                return this.rejectStep(
+                    "checkEnvironmentDependencies",
+                    "Select a serverless environment",
+                    "No serverless environment is configured.",
+                    this.selectServerlessEnvironmentVersion.bind(this)
+                );
+            }
+            const environment = resolvedServerlessEnvironment.environment;
+            const compatibility =
+                this.serverlessEnvironmentService.getDatabricksConnectCompatibility(
+                    version
+                );
+            if (compatibility.status !== "supported") {
+                return this.rejectStep(
+                    "checkEnvironmentDependencies",
+                    "Update databricks-connect",
+                    compatibility.upgradeMessage,
+                    this.reinstallDbConnect.bind(this)
+                );
+            }
+            if (compatibility.environment.version !== environment.version) {
+                return this.rejectStep(
+                    "checkEnvironmentDependencies",
+                    "Update databricks-connect",
+                    `Databricks Connect ${version} is mapped to ${compatibility.environment.label}, but the current serverless selection is ${environment.label}. Install Databricks Connect ${environment.databricksConnectLabel} or select ${compatibility.environment.label}.`,
+                    this.reinstallDbConnect.bind(this)
+                );
+            }
+            return this.acceptStep(
                 "checkEnvironmentDependencies",
-                "Update databricks-connect",
-                `Databricks Connect ${version} doesn't support serverless, please update to 15.1.0 or higher.`,
-                this.reinstallDbConnect.bind(this)
+                `Databricks Connect: ${version}`
             );
         }
         if (dbconnectMajor < 13) {
@@ -331,7 +423,9 @@ export class EnvironmentDependenciesVerifier extends MultiStepAccessVerifier {
                     "databricks-connect"
                 );
             if (dbconnect) {
-                return this.checkDatabricksConnectVersion(dbconnect.version);
+                return await this.checkDatabricksConnectVersion(
+                    dbconnect.version
+                );
             } else {
                 return this.rejectStep(
                     "checkEnvironmentDependencies",

@@ -23,6 +23,12 @@ import {
 } from "../ui/configuration-view/AuthTypeComponent";
 import {ManualLoginSource} from "../telemetry/constants";
 import {onError} from "../utils/onErrorDecorator";
+import {
+    ServerlessEnvironmentService,
+    SupportedServerlessEnvironment,
+    ServerlessHardwareType,
+    ServerlessHardwareOption,
+} from "../serverless/ServerlessEnvironmentService";
 
 function formatQuickPickClusterSize(sizeInMB: number): string {
     if (sizeInMB > 1024) {
@@ -56,6 +62,15 @@ export interface ClusterItem extends QuickPickItem {
     cluster: Cluster;
 }
 
+interface ServerlessEnvironmentItem extends QuickPickItem {
+    environment?: SupportedServerlessEnvironment;
+    isCustom?: boolean;
+}
+
+interface ServerlessHardwareItem extends QuickPickItem {
+    hardware: ServerlessHardwareType;
+}
+
 export class ConnectionCommands implements Disposable {
     private disposables: Disposable[] = [];
     constructor(
@@ -63,8 +78,152 @@ export class ConnectionCommands implements Disposable {
         private connectionManager: ConnectionManager,
         private readonly clusterModel: ClusterModel,
         private readonly configModel: ConfigModel,
-        private readonly cli: CliWrapper
+        private readonly cli: CliWrapper,
+        private readonly serverlessEnvironmentService: ServerlessEnvironmentService
     ) {}
+
+    async selectServerlessHardware(arg?: {
+        skipIfAlreadyConfigured?: boolean;
+        title?: string;
+    }) {
+        const configuredHardware =
+            await this.serverlessEnvironmentService.getConfiguredHardware();
+        const defaultHardware =
+            this.serverlessEnvironmentService.defaultHardware;
+        if (
+            arg?.skipIfAlreadyConfigured &&
+            configuredHardware !== defaultHardware.id
+        ) {
+            return configuredHardware;
+        }
+
+        const hardwareOptions: ServerlessHardwareItem[] =
+            this.serverlessEnvironmentService.supportedHardware.map(
+                (option: ServerlessHardwareOption) => ({
+                    label: option.label,
+                    detail: option.detail,
+                    hardware: option.id,
+                    picked: configuredHardware === option.id,
+                    description:
+                        configuredHardware === option.id
+                            ? "Current"
+                            : option.isDefault
+                              ? "Recommended"
+                              : undefined,
+                })
+            );
+
+        const selectedItem = await window.showQuickPick<ServerlessHardwareItem>(
+            hardwareOptions,
+            {
+                title: arg?.title ?? "Select Serverless Hardware",
+            }
+        );
+        if (!selectedItem) {
+            return configuredHardware;
+        }
+
+        await this.serverlessEnvironmentService.setConfiguredHardware(
+            selectedItem.hardware
+        );
+        return selectedItem.hardware;
+    }
+
+    async selectServerlessEnvironmentVersion(arg?: {
+        skipIfAlreadyConfigured?: boolean;
+        title?: string;
+    }) {
+        const configuredEnvironment =
+            await this.serverlessEnvironmentService.getConfiguredEnvironment();
+        const customEnvironmentPath =
+            await this.serverlessEnvironmentService.getConfiguredCustomEnvironmentPath();
+        if (
+            arg?.skipIfAlreadyConfigured &&
+            (configuredEnvironment || customEnvironmentPath)
+        ) {
+            return configuredEnvironment;
+        }
+
+        const latestEnvironment =
+            this.serverlessEnvironmentService.latestEnvironment;
+        const selectableItems: ServerlessEnvironmentItem[] = [
+            ...this.serverlessEnvironmentService.supportedEnvironments
+                .slice()
+                .reverse()
+                .map((environment) => ({
+                    label: environment.label,
+                    description:
+                        !customEnvironmentPath &&
+                        configuredEnvironment?.version === environment.version
+                            ? "Current"
+                            : environment.version === latestEnvironment.version
+                              ? "Recommended"
+                              : undefined,
+                    detail: environment.detail,
+                    picked:
+                        !customEnvironmentPath &&
+                        (configuredEnvironment?.version ===
+                            environment.version ||
+                            (!configuredEnvironment &&
+                                environment.version ===
+                                    latestEnvironment.version)),
+                    environment,
+                })),
+            {
+                label: "",
+                kind: QuickPickItemKind.Separator,
+            },
+            {
+                label: "$(file-code) Custom (environment.yml)",
+                detail: customEnvironmentPath
+                    ? `Current: ${customEnvironmentPath}`
+                    : "Specify a YAML file with a custom environment definition",
+                description: customEnvironmentPath ? "Current" : undefined,
+                picked: !!customEnvironmentPath,
+                isCustom: true,
+            },
+        ];
+
+        const selectedItem =
+            await window.showQuickPick<ServerlessEnvironmentItem>(
+                selectableItems,
+                {
+                    title: arg?.title ?? "Select Serverless Environment",
+                }
+            );
+        if (!selectedItem) {
+            return configuredEnvironment;
+        }
+
+        if (selectedItem.isCustom) {
+            const yamlPath = await window.showInputBox({
+                title: "Custom Environment YAML Path",
+                prompt: "Enter the workspace path to the environment.yml file (e.g. /Workspace/environments/custom.yml)",
+                value: customEnvironmentPath ?? "",
+                validateInput: (value) => {
+                    if (!value.trim()) {
+                        return "A YAML file path is required";
+                    }
+                    return undefined;
+                },
+            });
+            if (yamlPath) {
+                await this.serverlessEnvironmentService.setConfiguredCustomEnvironment(
+                    yamlPath
+                );
+            }
+            return configuredEnvironment;
+        }
+
+        if (selectedItem.environment) {
+            await this.serverlessEnvironmentService.setConfiguredEnvironment(
+                selectedItem.environment.version
+            );
+            return selectedItem.environment;
+        }
+
+        return configuredEnvironment;
+    }
 
     /**
      * Disconnect from Databricks and reset project settings.
@@ -140,7 +299,7 @@ export class ConnectionCommands implements Disposable {
             const items: QuickPickItem[] = [
                 {
                     label: "$(cloud) Serverless",
-                    detail: `Run files as Workflows or use Databricks Connect without a dedicated cluster`,
+                    detail: `Run files as Workflows or use Databricks Connect with managed serverless compute`,
                     alwaysShow: false,
                 },
                 {
@@ -188,6 +347,10 @@ export class ConnectionCommands implements Disposable {
                     await this.connectionManager.attachCluster(cluster.id);
                 } else if (selectedItem.label === "$(cloud) Serverless") {
                     await this.connectionManager.enableServerless();
+                    await this.selectServerlessEnvironmentVersion({
+                        skipIfAlreadyConfigured: true,
+                        title: "Select Serverless Environment",
+                    });
                 } else {
                     await UrlUtils.openExternal(
                         `${

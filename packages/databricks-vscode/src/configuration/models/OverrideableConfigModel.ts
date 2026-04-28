@@ -10,6 +10,9 @@ export type OverrideableConfigState = {
     authProfile?: string;
     clusterId?: string;
     serverless?: boolean;
+    serverlessEnvironmentVersion?: string;
+    serverlessHardware?: string;
+    serverlessCustomEnvironmentPath?: string;
     useClusterOverride?: boolean;
 };
 
@@ -19,6 +22,9 @@ export function isOverrideableConfigKey(
     return [
         "authProfile",
         "clusterId",
+        "serverlessEnvironmentVersion",
+        "serverlessHardware",
+        "serverlessCustomEnvironmentPath",
         "useClusterOverride",
         "serverless",
     ].includes(key);

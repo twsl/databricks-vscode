@@ -16,6 +16,8 @@ import {LabelUtils} from "../utils";
 
 const TREE_ICON_ID = "CLUSTER";
 export const CLUSTER_OVERRIDE_CHECKBOX_ID = "OVERRIDE_CLUSTER";
+export const SERVERLESS_ENVIRONMENT_ID = "SERVERLESS_ENVIRONMENT";
+export const SERVERLESS_HARDWARE_ID = "SERVERLESS_HARDWARE";
 
 function getContextValue(key: string) {
     return `databricks.configuration.cluster.${key}`;
@@ -87,17 +89,46 @@ export class ClusterComponent extends BaseComponent {
             }),
             this.configModel.onDidChangeKey("useClusterOverride")(async () => {
                 this.onDidChangeEmitter.fire();
-            })
+            }),
+            this.configModel.onDidChangeKey("serverlessEnvironmentVersion")(
+                async () => {
+                    this.onDidChangeEmitter.fire();
+                }
+            ),
+            this.configModel.onDidChangeKey("serverlessHardware")(async () => {
+                this.onDidChangeEmitter.fire();
+            }),
+            this.configModel.onDidChangeKey("serverlessCustomEnvironmentPath")(
+                async () => {
+                    this.onDidChangeEmitter.fire();
+                }
+            )
         );
     }
 
     @onError({popup: true})
     private async getRoot(): Promise<ConfigurationTreeItem[]> {
         if (this.connectionManager.serverless) {
+            const resolvedServerlessEnvironment =
+                await this.connectionManager.resolveServerlessEnvironment();
+            if (!resolvedServerlessEnvironment) {
+                return [];
+            }
+            const hardwareOption =
+                this.connectionManager.serverlessEnvironmentService?.getHardwareOption(
+                    resolvedServerlessEnvironment.hardware
+                );
+            const hardwareLabel =
+                hardwareOption?.label ?? resolvedServerlessEnvironment.hardware;
+            const description =
+                resolvedServerlessEnvironment.customEnvironmentPath
+                    ? `Custom | ${hardwareLabel}`
+                    : `${resolvedServerlessEnvironment.environment.label} | ${hardwareLabel}`;
             return [
                 {
                     label: "Serverless",
-                    collapsibleState: TreeItemCollapsibleState.None,
+                    description,
+                    collapsibleState: TreeItemCollapsibleState.Collapsed,
                     contextValue: getContextValue("serverless"),
                     iconPath: new ThemeIcon(
                         "cloud",
@@ -195,6 +226,57 @@ export class ClusterComponent extends BaseComponent {
 
         if (parent.id !== TREE_ICON_ID) {
             return [];
+        }
+
+        if (this.connectionManager.serverless) {
+            const resolvedServerlessEnvironment =
+                await this.connectionManager.resolveServerlessEnvironment();
+            if (!resolvedServerlessEnvironment) {
+                return [];
+            }
+            const environment = resolvedServerlessEnvironment.environment;
+            const hardwareOption =
+                this.connectionManager.serverlessEnvironmentService?.getHardwareOption(
+                    resolvedServerlessEnvironment.hardware
+                );
+            const hardwareLabel = hardwareOption
+                ? `${hardwareOption.label} (${hardwareOption.detail})`
+                : resolvedServerlessEnvironment.hardware;
+            const environmentDescription =
+                resolvedServerlessEnvironment.customEnvironmentPath
+                    ? `Custom: ${resolvedServerlessEnvironment.customEnvironmentPath}`
+                    : environment.label;
+            const children: ConfigurationTreeItem[] = [
+                {
+                    label: "Environment",
+                    description: environmentDescription,
+                    tooltip: resolvedServerlessEnvironment.customEnvironmentPath
+                        ? `Using custom environment from ${resolvedServerlessEnvironment.customEnvironmentPath}`
+                        : `${environment.detail}. Select the serverless environment used for workflow runs and Databricks Connect compatibility checks.`,
+                    contextValue: getContextValue("serverless.environment"),
+                    command: {
+                        title: "Select serverless environment",
+                        command:
+                            "databricks.serverless.selectEnvironmentVersion",
+                    },
+                    collapsibleState: TreeItemCollapsibleState.None,
+                    id: SERVERLESS_ENVIRONMENT_ID,
+                },
+                {
+                    label: "Hardware",
+                    description: hardwareLabel,
+                    tooltip: `Serverless compute hardware configuration. Use the select command to see available options.`,
+                    contextValue: getContextValue("serverless.hardware"),
+                    command: {
+                        title: "Select serverless hardware",
+                        command: "databricks.serverless.selectHardware",
+                    },
+                    collapsibleState: TreeItemCollapsibleState.None,
+                    id: SERVERLESS_HARDWARE_ID,
+                },
+            ];
+
+            return children;
         }
 
         // If there is no cluster, we don't have to show cluster details

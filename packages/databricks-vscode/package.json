@@ -360,6 +360,20 @@
                 "category": "Databricks"
             },
             {
+                "command": "databricks.serverless.selectEnvironmentVersion",
+                "title": "Select serverless environment",
+                "icon": "$(versions)",
+                "enablement": "databricks.context.activated && databricks.context.loggedIn && !databricks.context.remoteMode",
+                "category": "Databricks"
+            },
+            {
+                "command": "databricks.serverless.selectHardware",
+                "title": "Select serverless hardware",
+                "icon": "$(dashboard)",
+                "enablement": "databricks.context.activated && databricks.context.loggedIn && !databricks.context.remoteMode",
+                "category": "Databricks"
+            },
+            {
                 "command": "databricks.bundle.variable.openFile",
                 "title": "Override bundle variables",
                 "enablement": "databricks.context.activated && databricks.context.bundle.isTargetSet && databricks.context.bundle.deploymentState == idle && !databricks.context.remoteMode",
@@ -644,12 +658,12 @@
                 },
                 {
                     "command": "databricks.connection.attachClusterQuickPick",
-                    "when": "view == configurationView && viewItem =~ /^databricks.configuration.cluster.*$/ && databricks.context.bundle.deploymentState == idle",
+                    "when": "view == configurationView && viewItem =~ /^databricks.configuration.cluster(?!\\.serverless\\.(environment|hardware)).*$/ && databricks.context.bundle.deploymentState == idle",
                     "group": "inline@2"
                 },
                 {
                     "command": "databricks.connection.attachClusterQuickPick",
-                    "when": "view == configurationView && viewItem =~ /^databricks.configuration.cluster.*$/ && databricks.context.bundle.deploymentState == idle",
+                    "when": "view == configurationView && viewItem =~ /^databricks.configuration.cluster(?!\\.serverless\\.(environment|hardware)).*$/ && databricks.context.bundle.deploymentState == idle",
                     "group": "navigation@2"
                 },
                 {
@@ -767,6 +781,30 @@
                     "when": "view == configurationView && viewItem =~ /^databricks.environment.checkEnvironmentDependencies.success$/",
                     "group": "navigation@0",
                     "icon": "$(gear)"
+                },
+                {
+                    "command": "databricks.serverless.selectEnvironmentVersion",
+                    "when": "view == configurationView && viewItem == databricks.configuration.cluster.serverless.environment && databricks.context.bundle.deploymentState == idle",
+                    "group": "inline@1",
+                    "icon": "$(versions)"
+                },
+                {
+                    "command": "databricks.serverless.selectEnvironmentVersion",
+                    "when": "view == configurationView && viewItem == databricks.configuration.cluster.serverless.environment && databricks.context.bundle.deploymentState == idle",
+                    "group": "navigation@1",
+                    "icon": "$(versions)"
+                },
+                {
+                    "command": "databricks.serverless.selectHardware",
+                    "when": "view == configurationView && viewItem == databricks.configuration.cluster.serverless.hardware && databricks.context.bundle.deploymentState == idle",
+                    "group": "inline@1",
+                    "icon": "$(dashboard)"
+                },
+                {
+                    "command": "databricks.serverless.selectHardware",
+                    "when": "view == configurationView && viewItem == databricks.configuration.cluster.serverless.hardware && databricks.context.bundle.deploymentState == idle",
+                    "group": "navigation@1",
+                    "icon": "$(dashboard)"
                 },
                 {
                     "command": "databricks.sync.start",

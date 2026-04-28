@@ -26,6 +26,10 @@ import {AutoLoginSource, ManualLoginSource} from "../telemetry/constants";
 import {Barrier} from "../locking/Barrier";
 import {WorkspaceFolderManager} from "../vscode-objs/WorkspaceFolderManager";
 import {ProjectConfigFile} from "../file-managers/ProjectConfigFile";
+import type {
+    ResolvedServerlessEnvironment,
+    ServerlessEnvironmentService,
+} from "../serverless/ServerlessEnvironmentService";
 
 // eslint-disable-next-line @typescript-eslint/naming-convention
 const {NamedLogger} = logging;
@@ -50,6 +54,7 @@ export class ConnectionManager implements Disposable {
     private _databricksWorkspace?: DatabricksWorkspace;
     private _metadataService: MetadataService;
     private _serverlessEnabled: boolean = false;
+    private _serverlessEnvironmentService?: ServerlessEnvironmentService;
 
     private readonly onDidChangeStateEmitter: EventEmitter<ConnectionState> =
         new EventEmitter();
@@ -166,6 +171,36 @@ export class ConnectionManager implements Disposable {
 
     get metadataServiceUrl() {
         return this._metadataService.url;
+    }
+
+    public get serverlessEnvironmentService():
+        | ServerlessEnvironmentService
+        | undefined {
+        return this._serverlessEnvironmentService;
+    }
+
+    private get requireServerlessEnvironmentService(): ServerlessEnvironmentService {
+        if (!this._serverlessEnvironmentService) {
+            throw new Error("Serverless environment service is not configured");
+        }
+
+        return this._serverlessEnvironmentService;
+    }
+
+    public setServerlessEnvironmentService(
+        serverlessEnvironmentService: ServerlessEnvironmentService
+    ) {
+        this._serverlessEnvironmentService = serverlessEnvironmentService;
+    }
+
+    public async resolveServerlessEnvironment(): Promise<
+        ResolvedServerlessEnvironment | undefined
+    > {
+        if (!this.serverless) {
+            return undefined;
+        }
+
+        return this.requireServerlessEnvironmentService.resolveEnvironment();
     }
 
     public async init() {

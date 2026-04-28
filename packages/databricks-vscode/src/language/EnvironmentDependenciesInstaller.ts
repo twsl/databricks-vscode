@@ -3,7 +3,12 @@ import {commands, EventEmitter, OutputChannel, window} from "vscode";
 import {Disposable} from "vscode";
 import {MsPythonExtensionWrapper} from "./MsPythonExtensionWrapper";
 import {ConnectionManager} from "../configuration/ConnectionManager";
-import {DATABRICKS_CONNECT_VERSION as DATABRICKS_CONNECT_MINIMAL_VERSION} from "../utils/constants";
+// Fallback versions when no specific cluster/serverless environment is configured.
+// See: https://docs.databricks.com/aws/en/dev-tools/databricks-connect/requirements#versions
+import {
+    DATABRICKS_CONNECT_VERSION as DATABRICKS_CONNECT_MINIMAL_VERSION,
+    DATABRICKS_CONNECT_SERVERLESS_MIN_VERSION,
+} from "../utils/constants";
 
 export class EnvironmentDependenciesInstaller implements Disposable {
     private disposables: Disposable[] = [];
@@ -67,7 +72,13 @@ export class EnvironmentDependenciesInstaller implements Disposable {
 
     async getSuggestedVersion() {
         if (this.connectionManager.serverless) {
-            return "15.1.*";
+            const resolvedServerlessEnvironment =
+                await this.connectionManager.resolveServerlessEnvironment();
+            if (resolvedServerlessEnvironment) {
+                return resolvedServerlessEnvironment.environment
+                    .suggestedDatabricksConnectVersion;
+            }
+            return DATABRICKS_CONNECT_SERVERLESS_MIN_VERSION;
         }
         const dbrVersionParts =
             this.connectionManager.cluster?.dbrVersion || [];
