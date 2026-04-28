@@ -568,7 +568,8 @@ export async function activate(
 
     const configurationTreeViewManager = new ConfigurationTreeViewManager(
         configurationView,
-        configModel
+        configModel,
+        connectionManager
     );
 
     const clusterModel = new ClusterModel(connectionManager);

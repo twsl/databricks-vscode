@@ -175,7 +175,9 @@ export class ClusterComponent extends BaseComponent {
         const overrideClusterLabel = "Override Jobs cluster in bundle";
         const clusterOverrideTooltip =
             "Use the selected cluster for all jobs in the bundle";
-        return [
+        const clusterSupportsJobs = cluster.supportsJobs();
+
+        const items: ConfigurationTreeItem[] = [
             {
                 label: "Cluster",
                 tooltip: url ? undefined : "Created after deploy",
@@ -192,7 +194,10 @@ export class ClusterComponent extends BaseComponent {
                 id: TREE_ICON_ID,
                 url,
             },
-            {
+        ];
+
+        if (clusterSupportsJobs) {
+            items.push({
                 label: useClusterOverride
                     ? LabelUtils.highlightedLabel(overrideClusterLabel)
                     : overrideClusterLabel,
@@ -205,8 +210,23 @@ export class ClusterComponent extends BaseComponent {
                 tooltip: clusterOverrideTooltip,
                 id: CLUSTER_OVERRIDE_CHECKBOX_ID,
                 collapsibleState: TreeItemCollapsibleState.None,
-            },
-        ];
+            });
+        } else {
+            items.push({
+                label: overrideClusterLabel,
+                description: "Not supported",
+                tooltip:
+                    "This cluster does not support jobs workload. Select a cluster with jobs workload enabled to use this feature.",
+                iconPath: new ThemeIcon(
+                    "warning",
+                    new ThemeColor("notificationsWarningIcon.foreground")
+                ),
+                id: CLUSTER_OVERRIDE_CHECKBOX_ID,
+                collapsibleState: TreeItemCollapsibleState.None,
+            });
+        }
+
+        return items;
     }
 
     public async getChildren(

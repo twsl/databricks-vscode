@@ -142,6 +142,17 @@ export class ConnectionManager implements Disposable {
             ) {
                 this.cli.setClusterId(clusterId);
             }
+            if (
+                this.cluster &&
+                !this.cluster.supportsJobs() &&
+                (await this.configModel.get("useClusterOverride"))
+            ) {
+                await this.configModel.set("useClusterOverride", false);
+                this.cli.setClusterId(undefined);
+                window.showWarningMessage(
+                    "The selected cluster does not support jobs workload. The 'Override Jobs cluster in bundle' option has been disabled."
+                );
+            }
             if (this.cluster) {
                 this.telemetry.recordEvent(Events.COMPUTE_SELECTED, {
                     type: "cluster",

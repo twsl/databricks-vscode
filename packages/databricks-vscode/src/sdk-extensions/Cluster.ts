@@ -156,6 +156,12 @@ export class Cluster {
         );
     }
 
+    supportsJobs(): boolean {
+        const jobs = this.clusterDetails.workload_type?.clients?.jobs;
+        // If workload_type is not set, the cluster supports jobs by default
+        return jobs !== false;
+    }
+
     get hasExecutePermsCached() {
         return this._hasExecutePerms;
     }

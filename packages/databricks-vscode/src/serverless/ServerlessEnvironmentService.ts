@@ -233,7 +233,7 @@ function compareVersions(left: ParsedVersion, right: ParsedVersion): number {
 }
 
 // Default hardware options when workspace-specific options are not available.
-// Source: https://learn.microsoft.com/en-gb/azure/databricks/compute/configure-serverless#compute-size
+// Source: https://docs.databricks.com/aws/en/compute/serverless/dependencies#use-high-memory-serverless-compute
 const DEFAULT_HARDWARE_OPTIONS: readonly ServerlessHardwareOption[] = [
     {
         id: "standard",
