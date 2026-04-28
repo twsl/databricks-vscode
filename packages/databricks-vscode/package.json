@@ -374,6 +374,13 @@
                 "category": "Databricks"
             },
             {
+                "command": "databricks.serverless.selectUsagePolicy",
+                "title": "Configure serverless usage policy",
+                "icon": "$(tag)",
+                "enablement": "databricks.context.activated && databricks.context.loggedIn && !databricks.context.remoteMode",
+                "category": "Databricks"
+            },
+            {
                 "command": "databricks.bundle.variable.openFile",
                 "title": "Override bundle variables",
                 "enablement": "databricks.context.activated && databricks.context.bundle.isTargetSet && databricks.context.bundle.deploymentState == idle && !databricks.context.remoteMode",
@@ -805,6 +812,18 @@
                     "when": "view == configurationView && viewItem == databricks.configuration.cluster.serverless.hardware && databricks.context.bundle.deploymentState == idle",
                     "group": "navigation@1",
                     "icon": "$(dashboard)"
+                },
+                {
+                    "command": "databricks.serverless.selectUsagePolicy",
+                    "when": "view == configurationView && viewItem == databricks.configuration.cluster.serverless.usage-policy && databricks.context.bundle.deploymentState == idle",
+                    "group": "inline@1",
+                    "icon": "$(tag)"
+                },
+                {
+                    "command": "databricks.serverless.selectUsagePolicy",
+                    "when": "view == configurationView && viewItem == databricks.configuration.cluster.serverless.usage-policy && databricks.context.bundle.deploymentState == idle",
+                    "group": "navigation@1",
+                    "icon": "$(tag)"
                 },
                 {
                     "command": "databricks.sync.start",

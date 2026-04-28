@@ -275,6 +275,7 @@ async function runBundleCommand(
  */
 export class CliWrapper {
     private clusterId?: string;
+    private useServerlessCompute = false;
     private _bundleVariableModel?: BundleVariableModel;
     private pythonExtension?: MsPythonExtensionWrapper;
 
@@ -294,6 +295,21 @@ export class CliWrapper {
 
     public setClusterId(clusterId?: string) {
         this.clusterId = clusterId;
+    }
+
+    public setUseServerlessCompute(enabled: boolean) {
+        this.useServerlessCompute = enabled;
+    }
+
+    private getBundleComputeEnvVars() {
+        return {
+            /* eslint-disable @typescript-eslint/naming-convention */
+            DATABRICKS_CLUSTER_ID: this.clusterId,
+            DATABRICKS_SERVERLESS_COMPUTE_ID: this.useServerlessCompute
+                ? "auto"
+                : undefined,
+            /* eslint-enable @typescript-eslint/naming-convention */
+        };
     }
 
     get cliPath(): string {
@@ -484,10 +500,8 @@ export class CliWrapper {
             ...authProvider.toEnv(),
             ...this.getLogginEnvVars(),
             ...((await this._bundleVariableModel?.getEnvVariables()) ?? {}),
-            /* eslint-disable @typescript-eslint/naming-convention */
-            DATABRICKS_CLUSTER_ID: this.clusterId,
+            ...this.getBundleComputeEnvVars(),
             PATH: shellPath,
-            /* eslint-enable @typescript-eslint/naming-convention */
         });
     }
 
@@ -616,7 +630,9 @@ export class CliWrapper {
                 start: [`Deploying the bundle for target ${target}...`].concat(
                     this.clusterId
                         ? [`DATABRICKS_CLUSTER_ID=${this.clusterId}`]
-                        : []
+                        : this.useServerlessCompute
+                          ? ["DATABRICKS_SERVERLESS_COMPUTE_ID=auto"]
+                          : []
                 ),
                 end: "Bundle deployed successfully.",
                 error: "Failed to deploy the bundle.",
@@ -709,8 +725,7 @@ export class CliWrapper {
             ...authProvider.toEnv(),
             ...((await this._bundleVariableModel?.getEnvVariables()) ?? {}),
             ...this.getLogginEnvVars(),
-            // eslint-disable-next-line @typescript-eslint/naming-convention
-            DATABRICKS_CLUSTER_ID: this.clusterId,
+            ...this.getBundleComputeEnvVars(),
         });
 
         return {

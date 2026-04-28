@@ -12,6 +12,7 @@ export type OverrideableConfigState = {
     serverless?: boolean;
     serverlessEnvironmentVersion?: string;
     serverlessHardware?: string;
+    serverlessBudgetPolicyId?: string;
     serverlessCustomEnvironmentPath?: string;
     useClusterOverride?: boolean;
 };
@@ -24,6 +25,7 @@ export function isOverrideableConfigKey(
         "clusterId",
         "serverlessEnvironmentVersion",
         "serverlessHardware",
+        "serverlessBudgetPolicyId",
         "serverlessCustomEnvironmentPath",
         "useClusterOverride",
         "serverless",

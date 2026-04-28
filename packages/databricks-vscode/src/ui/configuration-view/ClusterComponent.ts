@@ -18,6 +18,7 @@ const TREE_ICON_ID = "CLUSTER";
 export const CLUSTER_OVERRIDE_CHECKBOX_ID = "OVERRIDE_CLUSTER";
 export const SERVERLESS_ENVIRONMENT_ID = "SERVERLESS_ENVIRONMENT";
 export const SERVERLESS_HARDWARE_ID = "SERVERLESS_HARDWARE";
+export const SERVERLESS_USAGE_POLICY_ID = "SERVERLESS_USAGE_POLICY";
 
 function getContextValue(key: string) {
     return `databricks.configuration.cluster.${key}`;
@@ -98,6 +99,11 @@ export class ClusterComponent extends BaseComponent {
             this.configModel.onDidChangeKey("serverlessHardware")(async () => {
                 this.onDidChangeEmitter.fire();
             }),
+            this.configModel.onDidChangeKey("serverlessBudgetPolicyId")(
+                async () => {
+                    this.onDidChangeEmitter.fire();
+                }
+            ),
             this.configModel.onDidChangeKey("serverlessCustomEnvironmentPath")(
                 async () => {
                     this.onDidChangeEmitter.fire();
@@ -283,16 +289,32 @@ export class ClusterComponent extends BaseComponent {
                     id: SERVERLESS_ENVIRONMENT_ID,
                 },
                 {
-                    label: "Hardware",
+                    label: "Memory",
                     description: hardwareLabel,
-                    tooltip: `Serverless compute hardware configuration. Use the select command to see available options.`,
+                    tooltip:
+                        "Serverless notebook memory preference. High memory applies through notebook settings and is not mapped to job performance targets.",
                     contextValue: getContextValue("serverless.hardware"),
                     command: {
-                        title: "Select serverless hardware",
+                        title: "Select serverless memory",
                         command: "databricks.serverless.selectHardware",
                     },
                     collapsibleState: TreeItemCollapsibleState.None,
                     id: SERVERLESS_HARDWARE_ID,
+                },
+                {
+                    label: "Usage Policy",
+                    description:
+                        resolvedServerlessEnvironment.budgetPolicyId ??
+                        "Workspace default",
+                    tooltip:
+                        "Databricks budget policy ID to attribute serverless workflow runs. Leave unset to use the workspace default policy.",
+                    contextValue: getContextValue("serverless.usage-policy"),
+                    command: {
+                        title: "Configure serverless usage policy",
+                        command: "databricks.serverless.selectUsagePolicy",
+                    },
+                    collapsibleState: TreeItemCollapsibleState.None,
+                    id: SERVERLESS_USAGE_POLICY_ID,
                 },
             ];
 

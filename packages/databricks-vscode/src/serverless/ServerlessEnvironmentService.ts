@@ -11,7 +11,7 @@ import type {ResolvedEnvironment} from "../language/MsPythonExtensionApi";
 // - End-of-support versions: https://docs.databricks.com/aws/en/dev-tools/databricks-connect/requirements#end-of-support-versions
 export type ServerlessEnvironmentVersion = "1" | "2" | "3" | "4" | "5";
 
-// Hardware types for serverless compute.
+// Memory sizes for serverless compute.
 // Source: https://learn.microsoft.com/en-gb/azure/databricks/compute/configure-serverless#compute-size
 export type ServerlessHardwareType = string;
 
@@ -47,6 +47,7 @@ export type SupportedServerlessEnvironment =
 export type ResolvedServerlessEnvironment = {
     environment: SupportedServerlessEnvironment;
     hardware: ServerlessHardwareType;
+    budgetPolicyId?: string;
     customEnvironmentPath?: string;
     source: "configured" | "detectedDatabricksConnect" | "default";
 };
@@ -308,8 +309,22 @@ export class ServerlessEnvironmentService {
         return this.configModel.get("serverlessCustomEnvironmentPath");
     }
 
+    async getConfiguredBudgetPolicyId(): Promise<string | undefined> {
+        const value = await this.configModel.get("serverlessBudgetPolicyId");
+        const trimmed = value?.trim();
+        return trimmed ? trimmed : undefined;
+    }
+
     async setConfiguredCustomEnvironmentPath(path?: string) {
         await this.configModel.set("serverlessCustomEnvironmentPath", path);
+    }
+
+    async setConfiguredBudgetPolicyId(budgetPolicyId?: string) {
+        const trimmed = budgetPolicyId?.trim();
+        await this.configModel.set(
+            "serverlessBudgetPolicyId",
+            trimmed ? trimmed : undefined
+        );
     }
 
     async getConfiguredEnvironment(): Promise<
@@ -366,6 +381,7 @@ export class ServerlessEnvironmentService {
 
     async resolveEnvironment(): Promise<ResolvedServerlessEnvironment> {
         const hardware = await this.getConfiguredHardware();
+        const budgetPolicyId = await this.getConfiguredBudgetPolicyId();
         const customEnvironmentPath =
             await this.getConfiguredCustomEnvironmentPath();
 
@@ -373,6 +389,7 @@ export class ServerlessEnvironmentService {
             return {
                 environment: this.latestEnvironment,
                 hardware,
+                budgetPolicyId,
                 customEnvironmentPath,
                 source: "configured",
             };
@@ -383,6 +400,7 @@ export class ServerlessEnvironmentService {
             return {
                 environment: configuredEnvironment,
                 hardware,
+                budgetPolicyId,
                 source: "configured",
             };
         }
@@ -393,6 +411,7 @@ export class ServerlessEnvironmentService {
             return {
                 environment: detectedEnvironment,
                 hardware,
+                budgetPolicyId,
                 source: "detectedDatabricksConnect",
             };
         }
@@ -400,6 +419,7 @@ export class ServerlessEnvironmentService {
         return {
             environment: this.latestEnvironment,
             hardware,
+            budgetPolicyId,
             source: "default",
         };
     }

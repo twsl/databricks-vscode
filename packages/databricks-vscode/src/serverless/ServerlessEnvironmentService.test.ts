@@ -78,6 +78,14 @@ describe(__filename, () => {
         assert.equal(resolved.source, "configured");
     });
 
+    it("includes budget policy in resolved environment", async () => {
+        configState.serverlessBudgetPolicyId = "policy-123";
+
+        const resolved = await service.resolveEnvironment();
+
+        assert.equal(resolved.budgetPolicyId, "policy-123");
+    });
+
     it("defaults hardware to standard", async () => {
         const resolved = await service.resolveEnvironment();
 
@@ -196,6 +204,15 @@ describe(__filename, () => {
         );
         // Standard version should be cleared when custom is selected
         assert.equal(configState.serverlessEnvironmentVersion, undefined);
+    });
+
+    it("persists budget policy through the config model", async () => {
+        await service.setConfiguredBudgetPolicyId(" policy-123 ");
+
+        assert.equal(configState.serverlessBudgetPolicyId, "policy-123");
+
+        const budgetPolicyId = await service.getConfiguredBudgetPolicyId();
+        assert.equal(budgetPolicyId, "policy-123");
     });
 
     it("clears custom environment when selecting a standard version", async () => {

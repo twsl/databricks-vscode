@@ -45,7 +45,8 @@ export function getSimpleJobsResource(def: Omit<SimpleJob, "name">) {
         if (
             task.job_cluster_key === undefined &&
             task.new_cluster === undefined &&
-            task.existing_cluster_id === undefined
+            task.existing_cluster_id === undefined &&
+            task.environment_key === undefined
         ) {
             task.job_cluster_key = "job_cluster";
         }

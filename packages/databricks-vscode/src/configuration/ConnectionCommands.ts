@@ -129,6 +129,32 @@ export class ConnectionCommands implements Disposable {
         return selectedItem.hardware;
     }
 
+    async selectServerlessBudgetPolicy(arg?: {
+        skipIfAlreadyConfigured?: boolean;
+        title?: string;
+    }) {
+        const configuredBudgetPolicyId =
+            await this.serverlessEnvironmentService.getConfiguredBudgetPolicyId();
+        if (arg?.skipIfAlreadyConfigured && configuredBudgetPolicyId) {
+            return configuredBudgetPolicyId;
+        }
+
+        const budgetPolicyId = await window.showInputBox({
+            title: arg?.title ?? "Configure Serverless Usage Policy",
+            prompt: "Enter the Databricks budget policy ID to attribute serverless runs. Leave empty to use the workspace default policy.",
+            value: configuredBudgetPolicyId ?? "",
+        });
+
+        if (budgetPolicyId === undefined) {
+            return configuredBudgetPolicyId;
+        }
+
+        await this.serverlessEnvironmentService.setConfiguredBudgetPolicyId(
+            budgetPolicyId
+        );
+        return budgetPolicyId.trim() || undefined;
+    }
+
     async selectServerlessEnvironmentVersion(arg?: {
         skipIfAlreadyConfigured?: boolean;
         title?: string;

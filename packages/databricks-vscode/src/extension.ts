@@ -627,6 +627,11 @@ export async function activate(
             connectionCommands
         ),
         telemetry.registerCommand(
+            "databricks.serverless.selectUsagePolicy",
+            connectionCommands.selectServerlessBudgetPolicy,
+            connectionCommands
+        ),
+        telemetry.registerCommand(
             "databricks.connection.detachCluster",
             connectionCommands.detachClusterCommand(),
             connectionCommands

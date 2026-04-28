@@ -116,6 +116,20 @@ export class ConnectionManager implements Disposable {
     @onError({
         popup: {prefix: "Error attaching cluster: "},
     })
+    private async updateCliComputeOverride() {
+        const useClusterOverride =
+            await this.configModel.get("useClusterOverride");
+        this.cli.setClusterId(
+            this.serverless || !useClusterOverride
+                ? undefined
+                : this._clusterManager?.cluster?.id
+        );
+        this.cli.setUseServerlessCompute(this.serverless);
+    }
+
+    @onError({
+        popup: {prefix: "Error attaching cluster: "},
+    })
     private async updateClusterManager() {
         try {
             const clusterId = await this.configModel.get("clusterId");
@@ -137,22 +151,16 @@ export class ConnectionManager implements Disposable {
                     : undefined;
 
             if (
-                (await this.configModel.get("useClusterOverride")) ||
-                clusterId === undefined
-            ) {
-                this.cli.setClusterId(clusterId);
-            }
-            if (
                 this.cluster &&
                 !this.cluster.supportsJobs() &&
                 (await this.configModel.get("useClusterOverride"))
             ) {
                 await this.configModel.set("useClusterOverride", false);
-                this.cli.setClusterId(undefined);
                 window.showWarningMessage(
                     "The selected cluster does not support jobs workload. The 'Override Jobs cluster in bundle' option has been disabled."
                 );
             }
+            await this.updateCliComputeOverride();
             if (this.cluster) {
                 this.telemetry.recordEvent(Events.COMPUTE_SELECTED, {
                     type: "cluster",
@@ -229,15 +237,7 @@ export class ConnectionManager implements Disposable {
                     this.updateServerless.bind(this)
                 ),
                 this.configModel.onDidChangeKey("useClusterOverride")(
-                    async () => {
-                        const useClusterOverride =
-                            await this.configModel.get("useClusterOverride");
-                        this.cli.setClusterId(
-                            useClusterOverride
-                                ? this._clusterManager?.cluster?.id
-                                : undefined
-                        );
-                    }
+                    this.updateCliComputeOverride.bind(this)
                 ),
                 // Don't just listen to target change for logging in. Also explictly listen for changes in the keys we care about.
                 // We don't have to listen to changes in authProfile as it's set by the login method and we don't respect other
@@ -517,6 +517,7 @@ export class ConnectionManager implements Disposable {
             await this.configModel.set("serverless", true);
             await this.configModel.set("useClusterOverride", false);
             await this.detachCluster();
+            await this.updateCliComputeOverride();
             this.customWhenContext.setServerless(true);
             this.onDidChangeClusterEmitter.fire(undefined);
             this.telemetry.recordEvent(Events.COMPUTE_SELECTED, {
@@ -532,6 +533,7 @@ export class ConnectionManager implements Disposable {
         if (this._serverlessEnabled) {
             this._serverlessEnabled = false;
             await this.configModel.set("serverless", false);
+            await this.updateCliComputeOverride();
             this.customWhenContext.setServerless(false);
             this.onDidChangeClusterEmitter.fire(undefined);
         }

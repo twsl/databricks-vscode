@@ -248,6 +248,54 @@ nothing = true
             throw e;
         }
     });
+
+    it("should set serverless compute env vars on bundle run CLI calls", async () => {
+        const logFilePath = getTempLogFilePath();
+        const cli = createCliWrapper(logFilePath);
+        cli.setUseServerlessCompute(true);
+        const authProvider = new ProfileAuthProvider(
+            new URL("https://test.com"),
+            "PROFILE",
+            cli,
+            true
+        );
+        const workspaceFolder = Uri.file("/test/123");
+        const runCmd = await cli.getBundleRunCommand(
+            "dev",
+            authProvider,
+            "resource-key",
+            workspaceFolder
+        );
+        const expected = {
+            args: ["bundle", "run", "--target", "dev", "resource-key"],
+            cmd: cli.cliPath,
+            options: {
+                cwd: workspaceFolder.fsPath,
+                env: removeUndefinedKeys({
+                    /* eslint-disable @typescript-eslint/naming-convention */
+                    DATABRICKS_CLI_UPSTREAM: "databricks-vscode",
+                    DATABRICKS_CLI_UPSTREAM_VERSION: extensionVersion,
+                    DATABRICKS_CONFIG_PROFILE: "PROFILE",
+                    DATABRICKS_HOST: "https://test.com/",
+                    DATABRICKS_LOG_FILE: logFilePath,
+                    DATABRICKS_LOG_FORMAT: "json",
+                    DATABRICKS_LOG_LEVEL: "debug",
+                    DATABRICKS_OUTPUT_FORMAT: "json",
+                    DATABRICKS_SERVERLESS_COMPUTE_ID: "auto",
+                    HOME: process.env.HOME,
+                    PATH: process.env.PATH,
+                    /* eslint-enable @typescript-eslint/naming-convention */
+                }),
+            },
+        };
+
+        try {
+            assert.ok(isMatch(runCmd, expected));
+        } catch (e) {
+            assert.deepStrictEqual(runCmd, expected);
+            throw e;
+        }
+    });
 });
 
 describe("waitForProcess", () => {

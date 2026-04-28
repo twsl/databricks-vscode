@@ -76,6 +76,64 @@ describe(__filename, () => {
         }
     });
 
+    it("includes budget policy for serverless python runs", async () => {
+        const originalSubmitRun = WorkflowRun.submitRun;
+        let capturedRequest: SubmitRun | undefined;
+
+        (WorkflowRun as any).submitRun = async (
+            _client: unknown,
+            submitRunRequest: SubmitRun
+        ) => {
+            capturedRequest = submitRunRequest;
+            return {
+                wait: async () => {},
+                getOutput: async () => ({logs: "hello"}),
+                lifeCycleState: "TERMINATED",
+            };
+        };
+
+        try {
+            await WorkflowRun.runPythonAndWait({
+                client: {} as any,
+                path: "/Workspace/main.py",
+                budgetPolicyId: "policy-123",
+            });
+
+            assert.equal(capturedRequest?.budget_policy_id, "policy-123");
+        } finally {
+            (WorkflowRun as any).submitRun = originalSubmitRun;
+        }
+    });
+
+    it("includes budget policy for serverless notebook runs", async () => {
+        const originalSubmitRun = WorkflowRun.submitRun;
+        let capturedRequest: SubmitRun | undefined;
+
+        (WorkflowRun as any).submitRun = async (
+            _client: unknown,
+            submitRunRequest: SubmitRun
+        ) => {
+            capturedRequest = submitRunRequest;
+            return {
+                wait: async () => {},
+                export: async () => ({metadata: {}}),
+                lifeCycleState: "TERMINATED",
+            };
+        };
+
+        try {
+            await WorkflowRun.runNotebookAndWait({
+                client: {} as any,
+                path: "/Workspace/notebook.ipynb",
+                budgetPolicyId: "policy-123",
+            });
+
+            assert.equal(capturedRequest?.budget_policy_id, "policy-123");
+        } finally {
+            (WorkflowRun as any).submitRun = originalSubmitRun;
+        }
+    });
+
     it("does not send serverless environment settings for cluster runs", async () => {
         const originalSubmitRun = WorkflowRun.submitRun;
         let capturedRequest: SubmitRun | undefined;
@@ -98,9 +156,11 @@ describe(__filename, () => {
                 clusterId: "cluster-123",
                 path: "/Workspace/main.py",
                 environmentVersion: "5",
+                budgetPolicyId: "policy-123",
             });
 
             assert.equal(capturedRequest?.environments, undefined);
+            assert.equal(capturedRequest?.budget_policy_id, undefined);
             assert.equal(
                 (capturedRequest?.tasks?.[0] as any)?.existing_cluster_id,
                 "cluster-123"

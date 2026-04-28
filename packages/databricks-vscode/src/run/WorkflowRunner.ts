@@ -144,6 +144,10 @@ export class WorkflowRunner implements Disposable {
         const recordRun = this.telemetry.start(Events.WORKFLOW_RUN);
         try {
             const notebookType = await FileUtils.isNotebook(program);
+            const resolvedServerlessEnvironment =
+                cluster === undefined
+                    ? await this.connectionManager.resolveServerlessEnvironment()
+                    : undefined;
             if (notebookType) {
                 taskType = "notebook";
                 let remoteFilePath: string =
@@ -168,6 +172,8 @@ export class WorkflowRunner implements Disposable {
                             .apiClient,
                         path: remoteFilePath,
                         clusterId: cluster?.id,
+                        budgetPolicyId:
+                            resolvedServerlessEnvironment?.budgetPolicyId,
                         parameters,
                         onProgress: (
                             state: jobs.RunLifeCycleState,
@@ -193,15 +199,13 @@ export class WorkflowRunner implements Disposable {
                               syncDestinationMapper.remoteUri
                           )
                         : undefined;
-                const resolvedServerlessEnvironment =
-                    cluster === undefined
-                        ? await this.connectionManager.resolveServerlessEnvironment()
-                        : undefined;
                 const response = await WorkflowRun.runPythonAndWait({
                     client: this.connectionManager.workspaceClient!.apiClient,
                     clusterId: cluster?.id,
                     environmentVersion:
                         resolvedServerlessEnvironment?.environment.version,
+                    budgetPolicyId:
+                        resolvedServerlessEnvironment?.budgetPolicyId,
                     customEnvironmentPath:
                         resolvedServerlessEnvironment?.customEnvironmentPath,
                     path: wrappedFile ? wrappedFile.path : originalFileUri.path,

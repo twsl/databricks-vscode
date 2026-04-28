@@ -34,6 +34,7 @@ export class WorkflowRun {
     static async runNotebookAndWait({
         client,
         clusterId,
+        budgetPolicyId,
         path,
         parameters = {},
         onProgress,
@@ -41,6 +42,7 @@ export class WorkflowRun {
     }: {
         client: ApiClient;
         clusterId?: string;
+        budgetPolicyId?: string;
         path: string;
         parameters?: Record<string, string>;
         onProgress?: (state: jobs.RunLifeCycleState, run: WorkflowRun) => void;
@@ -58,7 +60,11 @@ export class WorkflowRun {
         if (clusterId) {
             task["existing_cluster_id"] = clusterId;
         }
-        const run = await WorkflowRun.submitRun(client, {tasks: [task]});
+        const submitRunOptions: SubmitRun = {tasks: [task]};
+        if (!clusterId && budgetPolicyId) {
+            submitRunOptions.budget_policy_id = budgetPolicyId;
+        }
+        const run = await WorkflowRun.submitRun(client, submitRunOptions);
         await run.wait(onProgress, token);
         return await run.export();
     }
@@ -67,6 +73,7 @@ export class WorkflowRun {
         client,
         clusterId,
         environmentVersion,
+        budgetPolicyId,
         customEnvironmentPath,
         dependencies,
         path,
@@ -77,6 +84,7 @@ export class WorkflowRun {
         client: ApiClient;
         clusterId?: string;
         environmentVersion?: string;
+        budgetPolicyId?: string;
         customEnvironmentPath?: string;
         dependencies?: string[];
         path: string;
@@ -113,6 +121,9 @@ export class WorkflowRun {
                     spec,
                 },
             ];
+        }
+        if (!clusterId && budgetPolicyId) {
+            submitRunOptions.budget_policy_id = budgetPolicyId;
         }
         const run = await this.submitRun(client, submitRunOptions);
         await run.wait(onProgress, token);
